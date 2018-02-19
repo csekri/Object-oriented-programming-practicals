@@ -28,6 +28,7 @@ public class OXO implements OXOGame, Consumer<Move> {
 	private Side currentSide;
 	private Player nought,cross;
 	private final SquareMatrix<Cell> matrix;
+	private final List<Spectator> spectators;
 	
 	public OXO(int size, Side startSide, Player nought, Player cross) {
 		if(size <= 0) throw new IllegalArgumentException("Invalid size");
@@ -39,50 +40,63 @@ public class OXO implements OXOGame, Consumer<Move> {
 		this.nought = nought;
 		this.cross = cross;
 		this.matrix = new SquareMatrix<Cell>(size, new Cell());
+		this.spectators = new CopyOnWriteArrayList<>();
 		// TODO
 	}
-
+	
 	@Override
 	public void registerSpectators(Spectator... spectators) {
-		// TODO
-		throw new RuntimeException("Implement me");
+		this.spectators.addAll(Arrays.asList(spectators));
 	}
 
 	@Override
 	public void unregisterSpectators(Spectator... spectators) {
-		// TODO
-		throw new RuntimeException("Implement me");
+		this.spectators.removeAll(Arrays.asList(spectators));
 	}
 
 	@Override
 	public void start() {
 		Player player = (currentSide == Side.CROSS) ? cross : nought;
-		player.makeMove(this, validMoves(), this);
+		player.makeMove(this, validMoves(), m -> accept(m));
 	}
 
-	@Override
+	/*@Override
 	public ImmutableMatrix<Cell> board() {
 		return new ImmutableMatrix<>(matrix);
-	}
+	}*/
 
 	@Override
 	public Side currentSide() {
 		return this.currentSide;
 	}
 	
+	@Override
+	public ImmutableMatrix<Cell> board() {
+		return new ImmutableMatrix<>(matrix);
+	}
+	
 	private Set<Move> validMoves() {
 		  Set<Move> moves = new HashSet<>();
 		  for (int row = 0; row < matrix.rowSize(); row++) {
 		    for (int col = 0; col < matrix.columnSize(); col++) {
-		      if(matrix.get(row, col) == null) moves.add(new Move(row,col));//add moves here via moves.add(new Move(row, col)) if the matrix is empty at this location
+		      if(matrix.get(row, col).isEmpty()) moves.add(new Move(row,col));
+		      //add moves here via moves.add(new Move(row, col)) if the matrix is empty at this location
 		  } }
-		  //...
 		  return moves;
 		}
 	
 	 @Override
 	   public void accept(Move move) {
 	     // do something with the Move the current Player wants to play
-	   }
+		 if (! validMoves().contains(move)) {
+			 throw new IllegalArgumentException();
+		 } else {
+			 matrix.put(move.row, move.column, new Cell(currentSide()));
+			 //if (currentSide == Side.NOUGHT) currentSide = Side.CROSS; else currentSide = Side.NOUGHT;
+	     }
+		 for (Spectator s : spectators) {
+			 s.moveMade(currentSide(), move);
+		 }
+	 }
 
 }
